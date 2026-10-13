@@ -65,3 +65,47 @@ jobs:
             'type == "array" and length == 1 and .[0].id == 1 and .[0].status == "active"'
 
           echo "Torque Staging: HEALTHY"
+
+      # Report success only if both database checks passed.
+      - name: Report Success to Healthchecks.io
+        if: ${{ success() }}
+        env:
+          PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL }}
+        run: |
+          set -euo pipefail
+
+          echo "Both Torque databases are healthy."
+          echo "Sending success heartbeat..."
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --max-time 20 \
+            --output /dev/null \
+            "$PING_URL"
+
+          echo "Healthchecks.io: SUCCESS"
+
+      # Report failure if either database check failed.
+      - name: Report Failure to Healthchecks.io
+        if: ${{ failure() }}
+        env:
+          PING_URL: ${{ secrets.HEALTHCHECKS_PING_URL }}
+        run: |
+          set -euo pipefail
+
+          echo "Torque KeepAlive encountered a failure."
+          echo "Sending failure notification..."
+
+          curl \
+            --fail \
+            --silent \
+            --show-error \
+            --retry 3 \
+            --max-time 20 \
+            --output /dev/null \
+            "${PING_URL%/}/fail"
+
+          echo "Healthchecks.io: FAILURE REPORTED"
